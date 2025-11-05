@@ -36,8 +36,16 @@ hydb_connect <- function(path = NULL) {
 #'
 #' @note Must be a member of the `USDA Northern Region Hydrology` sharepoint group.
 
-hydb_disconnect <- function() {
+hydb_disconnect <- function(db = NULL) {
 
-  DBI::dbDisconnect(mydb)
+  if(is.null(db)) {
+
+    DBI::dbDisconnect(mydb)
+
+  } else {
+
+    DBI::dbDisconnect(db)
+
+  }
 
 }

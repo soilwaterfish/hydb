@@ -93,7 +93,7 @@ hydb_setup_metadata <- function(point) {
     dplyr::mutate(sid = paste0(sid, sprintf("%05d", md_start + dplyr::row_number())))
 
   if(any(meta_data$station_nm %in% md_stations$station_nm)){
-    if (yesno(paste0('There is ',length(meta_data$station_nm %in% md_stations$station_nm) ,' `station_nm` named the same.\n Do you wnat to continue?'))) {
+    if (yesno(paste0('There is ',sum(meta_data$station_nm %in% md_stations$station_nm > 0) ,' `station_nm` named the same.\n Do you wnat to continue?'))) {
       return(invisible())
     }
   }
@@ -101,7 +101,8 @@ hydb_setup_metadata <- function(point) {
   #then run to get COMID
   comids_nwis <- meta_data_copy %>%
     split(.$sid) %>%
-    purrr::map(~comids(.)$features$properties$identifier)
+    purrr::map(~comids(.))
+
 
   comids_nwis <- dplyr::tibble(COMID = as.character(comids_nwis),
                         sid = names(comids_nwis))
@@ -150,7 +151,7 @@ hydb_daily_transform <- function(data) {
     dplyr::ungroup() %>%
     dplyr::select(-dplyr::all_of(c(colname, 'dt'))) %>%
     dplyr::relocate(date, dplyr::starts_with('iv_')) %>%
-    tidyr::pivot_longer(dplyr::starts_with('iv_'))%>%
+    tidyr::pivot_longer(dplyr::starts_with('iv_')) %>%
     dplyr::mutate(statistic_type_code = stat_cd(name))
 
   param_type <- paste0('dv',unique(substr(data_add_daily_stats$name, 3, 8)))
@@ -168,7 +169,7 @@ hydb_daily_transform <- function(data) {
   } else if (any(startsWith(colnames(data), 'dv'))) {
 
   data %>%
-  dplyr::mutate(statistic_type_code = stat_cd_to_name(statistic_type_code)) %>%
+  dplyr::mutate(statistic_type_code = ifelse(is.na(statistic_type_code), 'mean', stat_cd_to_name(statistic_type_code))) %>%
   tidyr::pivot_wider(values_from = dplyr::starts_with('dv_'), names_from = statistic_type_code)
 
   } else if (any(!is.na(match(colnames(data), c('sum', 'max', 'min', 'mean', 'median', 'stdev', 'coef_var'))))) {

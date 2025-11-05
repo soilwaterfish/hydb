@@ -1,3 +1,42 @@
+#' Copy hydb.sqlite and keep only the latest backup.
+#' @param path Directory where hydb.sqlite and backups are stored.
+#' @return TRUE if copy succeeded and cleanup was performed.
+#' @export
+
+hydb_copy_db <- function(path = "C:/Users/joshualerickson/USDA/Northern Region Hydrology - Documents/data-madness/hydb") {
+
+    # Ensure path is normalized
+    path <- normalizePath(path, winslash = .Platform$file.sep)
+
+    # Timestamped backup name
+    timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
+    backup_name <- paste0("hydb_", timestamp, ".sqlite")
+
+    # Source and destination paths
+    source_db <- file.path(path, "hydb.sqlite")
+    destination_db <- file.path(path, backup_name)
+
+    # Copy the DB
+    success <- file.copy(from = source_db, to = destination_db, overwrite = TRUE)
+
+    # If copy succeeded, clean up old backups
+    if (success) {
+      # List all backup files matching pattern
+      backup_files <- list.files(path, pattern = "^hydb_\\d{8}_\\d{6}\\.sqlite$", full.names = TRUE)
+
+      # Keep the latest one only
+      if (length(backup_files) > 1) {
+        # Sort by filename descending (latest first)
+        backup_files_sorted <- sort(backup_files, decreasing = TRUE)
+
+        # Remove all except the first (latest)
+        file.remove(backup_files_sorted[-1])
+      }
+    }
+
+    return(success)
+}
+
 
 
 #' @param table_type A character.
@@ -116,14 +155,14 @@ comids <- function(point) {
   clat <- point$geometry[[1]][[2]]
   clng <- point$geometry[[1]][[1]]
 
-  ids <- paste0("https://labs.waterdata.usgs.gov/api/nldi/linked-data/comid/position?coords=POINT%28",
-                clng,"%20", clat, "%29")
+  ids <- paste0("https://api.water.usgs.gov/geoserver/wmadata", "/ows", "?service=WFS&request=GetFeature&version=1.0.0",
+         "&typeName=catchmentsp&outputFormat=application/json",
+         "&CQL_FILTER=INTERSECTS(the_geom, POINT (", clng,
+         " ", clat, "))", "&propertyName=featureid")
 
-  error_ids <- httr::GET(url = ids,
-                         httr::write_disk(path = file.path(tempdir(),
-                                                           "nld_tmp.json"),overwrite = TRUE))
+  d <- jsonlite::fromJSON(rawToChar(httr::RETRY("GET", utils::URLencode(ids))$content))
 
-  nld <- jsonlite::fromJSON(file.path(tempdir(),"nld_tmp.json"))
+  as.integer(d$features$properties$featureid)
 
 }
 
